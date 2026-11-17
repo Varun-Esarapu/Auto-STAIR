@@ -34,6 +34,7 @@ class ToCTree(BaseModel):
     """Complete hierarchical Table of Contents tree (ToC_D) of a document."""
     doc_id: str
     book_title: str
+    total_pages: int = Field(default=1, description="Total pages in the source document")
     nodes: List[ToCNode] = Field(default_factory=list)
 
     @property
@@ -77,10 +78,10 @@ class DynamicToCInducer:
     def __init__(self, groq_api_key: Optional[str] = None):
         self.api_key = groq_api_key or os.getenv("GROQ_API_KEY", "")
 
-    def extract_heading_candidates(self, doc: fitz.Document, max_pages: int = 50) -> List[Dict[str, Any]]:
+    def extract_heading_candidates(self, doc: fitz.Document, max_pages: int = 400) -> List[Dict[str, Any]]:
         """
         Extract candidate headings based on font size and boldness.
-        Scans pages up to max_pages to keep memory low (<500MB).
+        Scans up to max_pages to support full enterprise textbooks and multi-hundred-page specifications.
         """
         candidates: List[Dict[str, Any]] = []
         font_sizes: List[float] = []
@@ -243,7 +244,7 @@ class PDFToCParser:
             raw_toc = self.inducer.induce_toc(doc, actual_book_title)
 
         # 2. Build ToCNode objects and parent-child tree
-        toc_tree = self._build_tree(actual_doc_id, actual_book_title, raw_toc)
+        toc_tree = self._build_tree(actual_doc_id, actual_book_title, raw_toc, total_pages=len(doc))
 
         # 3. Extract intact leaf section texts
         sections = self._extract_leaf_sections(doc, toc_tree)
@@ -252,7 +253,7 @@ class PDFToCParser:
         return toc_tree, sections
 
     def _build_tree(
-        self, doc_id: str, book_title: str, raw_toc: List[Tuple[int, str, int] | List[Any]]
+        self, doc_id: str, book_title: str, raw_toc: List[Tuple[int, str, int] | List[Any]], total_pages: int = 1
     ) -> ToCTree:
         """
         Constructs the formal ToC_D tree from raw (level, title, page) records.
@@ -296,7 +297,7 @@ class PDFToCParser:
                 path_parts.append(curr.title)
             node.tree_path = " > ".join(reversed(path_parts))
 
-        return ToCTree(doc_id=doc_id, book_title=book_title, nodes=nodes)
+        return ToCTree(doc_id=doc_id, book_title=book_title, total_pages=total_pages, nodes=nodes)
 
     def _extract_leaf_sections(
         self, doc: fitz.Document, toc_tree: ToCTree

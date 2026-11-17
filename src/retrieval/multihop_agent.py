@@ -97,7 +97,53 @@ class MultiHopSTAIRAgent:
         current_hop = state["current_hop"]
         visited = set(state.get("visited_leaf_titles", []))
 
-        # Format ToC tree, marking leaves
+        # Check for Global Document Summarization intent
+        query_lower = state["query"].lower().strip()
+        summary_keywords = [
+            "summarise", "summarize", "summary", "overview", "what is this document about",
+            "what does this document cover", "executive summary", "brief this", "outline this"
+        ]
+        is_global_summary = any(kw in query_lower for kw in summary_keywords)
+
+        if is_global_summary and current_hop == 1:
+            # Multi-Leaf Global Ingestion for Executive Summarization
+            selected_leaves = []
+            all_leaves = toc_tree.leaf_titles
+            if all_leaves:
+                # 1. Primary Foundation leaf (Intro / Exec Summary / Preface / first leaf)
+                first_leaf = next(
+                    (t for t in all_leaves if any(k in t.lower() for k in ["summary", "overview", "introduction", "preface", "abstract"])),
+                    all_leaves[0]
+                )
+                selected_leaves.append(first_leaf)
+
+                # 2. Key Architecture/Methodology leaf
+                arch_leaf = next(
+                    (t for t in all_leaves if any(k in t.lower() for k in ["architecture", "method", "system", "design", "model", "breaking"])),
+                    None
+                )
+                if arch_leaf and arch_leaf not in selected_leaves:
+                    selected_leaves.append(arch_leaf)
+
+                # 3. Key Conclusion/Takeaways leaf
+                concl_leaf = next(
+                    (t for t in reversed(all_leaves) if any(k in t.lower() for k in ["conclusion", "result", "analysis", "summary", "takeaway"])),
+                    None
+                )
+                if concl_leaf and concl_leaf not in selected_leaves:
+                    selected_leaves.append(concl_leaf)
+
+                # Ensure at least 2 anchor leaves if available
+                if len(selected_leaves) < 2 and len(all_leaves) > 1:
+                    selected_leaves.append(all_leaves[len(all_leaves) // 2])
+
+            new_visited = list(state.get("visited_leaf_titles", []))
+            for sl in selected_leaves:
+                if sl not in new_visited:
+                    new_visited.append(sl)
+            return {"visited_leaf_titles": new_visited}
+
+        # Targeted Factoid Query: Standard STAIR Table 2 prompt
         formatted_toc = toc_tree.format_for_prompt(leaf_prefix=True)
 
         hop_query = state["query"]
@@ -152,6 +198,19 @@ class MultiHopSTAIRAgent:
             if sec:
                 retrieved.append(sec)
 
+        # Global document summaries span multiple leaves by definition: mark complete
+        query_lower = state["query"].lower().strip()
+        summary_keywords = [
+            "summarise", "summarize", "summary", "overview", "what is this document about",
+            "what does this document cover", "executive summary", "brief this", "outline this"
+        ]
+        if any(kw in query_lower for kw in summary_keywords):
+            return {
+                "retrieved_sections": retrieved,
+                "current_hop": current_hop,
+                "is_sufficient": True,
+            }
+
         # Check sufficiency: max 2 hops
         if current_hop >= 2:
             return {
@@ -203,17 +262,43 @@ class MultiHopSTAIRAgent:
             )
         combined_context = "\n\n---\n\n".join(context_blocks)
 
-        prompt = (
-            f"You are Auto-STAIR, an expert Structure-Aware Retrieval and Multi-Hop QA engine.\n"
-            f"Answer the user query thoroughly, professionally, and faithfully using strictly the structured section context below.\n\n"
-            f"Context:\n{combined_context}\n\n"
-            f"User Query: {state['query']}\n\n"
-            f"Formatting Guidelines:\n"
-            f"1. Start with a direct, comprehensive 2-sentence summary answering the query.\n"
-            f"2. Use clean markdown formatting with bold technical terms and structured bullet points for key concepts, mechanisms, or quantitative findings.\n"
-            f"3. Every factual claim MUST cite the source leaf node using the format `[{sections[0].leaf_title}]`.\n\n"
-            f"Structured Grounded Answer:"
-        )
+        query_lower = state["query"].lower().strip()
+        summary_keywords = [
+            "summarise", "summarize", "summary", "overview", "what is this document about",
+            "what does this document cover", "executive summary", "brief this", "outline this"
+        ]
+        is_global_summary = any(kw in query_lower for kw in summary_keywords)
+
+        if is_global_summary:
+            toc_tree: ToCTree = state["toc_tree"]
+            total_pages = getattr(toc_tree, "total_pages", len(sections))
+            outline_summary = toc_tree.format_for_prompt(leaf_prefix=False)[:3000]
+            prompt = (
+                f"You are Auto-STAIR, an enterprise Structure-Aware Document Intelligence Engine.\n"
+                f"Provide a comprehensive, high-level Executive Summary and Architectural Breakdown of '{state['book_title']}' "
+                f"({len(toc_tree.nodes)} ToC nodes across {total_pages} total pages).\n\n"
+                f"Document Hierarchical Structure:\n{outline_summary}\n\n"
+                f"Key Foundation Section Excerpts:\n{combined_context}\n\n"
+                f"User Request: {state['query']}\n\n"
+                f"Structure your response professionally using the following clean Markdown format:\n"
+                f"### Executive Overview\nA 2-3 sentence high-level synthesis of what this document is, its core mission, and target scope.\n\n"
+                f"### Structural & Architectural Breakdown\nKey Parts or Chapters identified from the Table of Contents, explaining their function and purpose.\n\n"
+                f"### Key Technical Highlights & Specifications\nBullet points highlighting core specifications, mechanisms, or metrics cited from the text.\n\n"
+                f"### Scope & Deployment Readiness\nDeployment considerations, limitations, or conclusions.\n\n"
+                f"Every key assertion MUST cite the relevant leaf section using `[{sections[0].leaf_title}]` style citations."
+            )
+        else:
+            prompt = (
+                f"You are Auto-STAIR, an expert Structure-Aware Retrieval and Multi-Hop QA engine.\n"
+                f"Answer the user query thoroughly, professionally, and faithfully using strictly the structured section context below.\n\n"
+                f"Context:\n{combined_context}\n\n"
+                f"User Query: {state['query']}\n\n"
+                f"Formatting Guidelines:\n"
+                f"1. Start with a direct, comprehensive 2-sentence summary answering the query.\n"
+                f"2. Use clean markdown formatting with bold technical terms and structured bullet points for key concepts, mechanisms, or quantitative findings.\n"
+                f"3. Every factual claim MUST cite the source leaf node using the format `[{sections[0].leaf_title}]`.\n\n"
+                f"Structured Grounded Answer:"
+            )
 
         answer = self._call_llm(prompt, model=self.synthesis_model, temperature=0.1)
         if not answer:

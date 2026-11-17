@@ -474,10 +474,12 @@ def load_sample_os_tome() -> Tuple[str, str, str, str, str, str, str]:
     """
 
     toc_md = "```text\n" + tree.format_for_prompt(leaf_prefix=True) + "\n```"
+    total_doc_pages = 85
+    SESSION["total_pages"] = total_doc_pages
     leaf_pills = "".join(
         f"""<div class="source-box" style="margin-bottom:8px;">
             <div class="source-name">{SVG_FILE_TEXT} <span>{s.leaf_title}</span></div>
-            <div class="source-meta">Pages {s.page_start}–{s.page_end} &bull; {s.tree_path}</div>
+            <div class="source-meta">Pages {s.page_start}–{s.page_end} of {total_doc_pages} &bull; {s.tree_path}</div>
         </div>"""
         for s in sections
     )
@@ -487,13 +489,24 @@ def load_sample_os_tome() -> Tuple[str, str, str, str, str, str, str]:
     sug3 = "TLB Cache Mechanics\nHow does a TLB accelerate virtual translation?"
     sug4 = "Crash Consistency & WAL\nHow does journaling prevent mid-write corruption?"
 
-    return status_html, toc_md, leaf_pills, sug1, sug2, sug3, sug4
+    doc_indicator_html = f"""
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #a1a1aa; padding-top: 6px;">
+        {SVG_LAYERS} <span>Active Document: <b>{tree.book_title}</b> (85 Pages &bull; {len(sections)} Leaves)</span>
+    </div>
+    """
+
+    return status_html, toc_md, leaf_pills, sug1, sug2, sug3, sug4, doc_indicator_html
 
 
-def process_custom_pdf(file_obj, custom_title: Optional[str] = None) -> Tuple[str, str, str, str, str, str, str]:
+def process_custom_pdf(file_obj, custom_title: Optional[str] = None) -> Tuple[str, str, str, str, str, str, str, str]:
     """Parse custom uploaded PDF into hierarchical tree and update suggestions dynamically."""
     if file_obj is None:
-        return "<div style='color:#f87171; font-size:12px;'>Please upload a valid PDF file.</div>", "", "", "", "", "", ""
+        err_ind = f"""
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #f87171; padding-top: 6px;">
+            {SVG_LAYERS} <span>Active: <b>No file selected</b></span>
+        </div>
+        """
+        return "<div style='color:#f87171; font-size:12px;'>Please upload a valid PDF file.</div>", "", "", "", "", "", "", err_ind
 
     pdf_path = file_obj.name if hasattr(file_obj, "name") else str(file_obj)
     doc_id = os.path.splitext(os.path.basename(pdf_path))[0]
@@ -508,12 +521,14 @@ def process_custom_pdf(file_obj, custom_title: Optional[str] = None) -> Tuple[st
         store.add_sections(sections)
         bm25 = BM25Retriever(sections)
 
+        total_pages = getattr(toc_tree, "total_pages", len(sections))
         SESSION["doc_id"] = doc_id
         SESSION["book_title"] = book_title
         SESSION["toc_tree"] = toc_tree
         SESSION["leaf_store"] = store
         SESSION["bm25"] = bm25
         SESSION["is_sample"] = False
+        SESSION["total_pages"] = total_pages
 
         status_html = f"""
         <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 10px 14px;">
@@ -521,7 +536,7 @@ def process_custom_pdf(file_obj, custom_title: Optional[str] = None) -> Tuple[st
                 {SVG_SHIELD} <span>Ingested: {book_title}</span>
             </div>
             <div style="font-size: 12px; color: #a1a1aa; margin-top: 4px;">
-                {len(toc_tree.nodes)} ToC Nodes &bull; {len(sections)} Terminal Leaves ($LN_D$) &bull; 100% Intact Section Text
+                {total_pages} Total Pages &bull; {len(toc_tree.nodes)} ToC Nodes &bull; {len(sections)} Terminal Leaves ($LN_D$) &bull; 100% Intact Section Text
             </div>
         </div>
         """
@@ -530,21 +545,30 @@ def process_custom_pdf(file_obj, custom_title: Optional[str] = None) -> Tuple[st
         leaf_pills = "".join(
             f"""<div class="source-box" style="margin-bottom:8px;">
                 <div class="source-name">{SVG_FILE_TEXT} <span>{s.leaf_title}</span></div>
-                <div class="source-meta">Pages {s.page_start}–{s.page_end} &bull; {s.tree_path}</div>
+                <div class="source-meta">Pages {s.page_start}–{s.page_end} of {total_pages} &bull; {s.tree_path}</div>
             </div>"""
             for s in sections[:25]
         )
 
-        # Generate intelligent suggestions matching the uploaded document's leaf titles!
         leaf_names = [s.leaf_title for s in sections]
         s1 = f"{leaf_names[0]}\nWhat are the primary objectives outlined in {leaf_names[0]}?" if len(leaf_names) > 0 else "Overview\nWhat is this document about?"
         s2 = f"{leaf_names[1]}\nExplain the core methodology described in {leaf_names[1]}." if len(leaf_names) > 1 else "Methodology\nHow does this work?"
-        s3 = f"{leaf_names[min(2, len(leaf_names)-1)]}\nWhat are the benchmark baselines or key experiments?" if len(leaf_names) > 2 else "Experiments\nWhat are the results?"
+        s3 = f"{leaf_names[min(2, len(leaf_names)-1)]}\nWhat are the benchmark baselines or key specifications?" if len(leaf_names) > 2 else "Specifications\nWhat are the details?"
         s4 = f"{leaf_names[-1]}\nWhat are the limitations or conclusions in {leaf_names[-1]}?" if len(leaf_names) > 3 else "Conclusion\nWhat are the takeaways?"
 
-        return status_html, toc_md, leaf_pills, s1, s2, s3, s4
+        doc_indicator_html = f"""
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #34d399; padding-top: 6px;">
+            {SVG_LAYERS} <span>Active Document: <b>{book_title}</b> ({total_pages} Pages &bull; {len(sections)} Terminal Leaves)</span>
+        </div>
+        """
+
+        return status_html, toc_md, leaf_pills, s1, s2, s3, s4, doc_indicator_html
     except Exception as e:
-        return f"<div style='color:#f87171;'>Error parsing PDF: {str(e)}</div>", "", "", "", "", "", ""
+        err_msg = f"<div style='color:#f87171;'>Error parsing PDF: {str(e)}</div>"
+        err_ind = f"""<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #f87171; padding-top: 6px;">
+            {SVG_LAYERS} <span>Error ingesting PDF</span>
+        </div>"""
+        return err_msg, "", "", "", "", "", "", err_ind
 
 
 def run_research_query(query: str) -> Tuple[str, str]:
@@ -583,6 +607,8 @@ def run_research_query(query: str) -> Tuple[str, str]:
     html_answer = re.sub(r'\[(.*?)\]', r'<span class="citation-badge">\1</span>', html_answer)
 
     # Reasoning Chain Block
+    total_doc_pages = SESSION.get("total_pages", len(visited_sections))
+    total_leaves = len(toc_tree.leaf_nodes) if toc_tree else len(visited_sections)
     hop_steps_html = []
     for h_idx, sec in enumerate(visited_sections, start=1):
         hop_steps_html.append(
@@ -597,6 +623,7 @@ def run_research_query(query: str) -> Tuple[str, str]:
         <div class="reasoning-title-row">
             <div class="pulse-ring"></div>
             <span>Reasoning Chain &bull; Multi-Hop Traversal</span>
+            <span style="margin-left:auto; font-size:11px; text-transform:none; color:#a1a1aa;">Doc: <b>{SESSION.get('book_title', 'Active Doc')}</b> ({total_doc_pages} Pages &bull; {total_leaves} Leaves)</span>
         </div>
         {"".join(hop_steps_html)}
         <div style="font-size: 11px; color: #a1a1aa; margin-top: 6px;">
@@ -795,14 +822,20 @@ with gr.Blocks(title="Auto-STAIR — Structure-Aware Document Intelligence") as 
             )
 
             # Custom PDF Parse Event: Updates status, ToC, leaves, and dynamic suggestions!
+            # Auto-ingest immediately on upload OR manual parse button click!
+            upload_file.upload(
+                fn=process_custom_pdf,
+                inputs=[upload_file, doc_title_box],
+                outputs=[ingest_status_html, toc_preview_md, leaf_preview_html, sug1_btn, sug2_btn, sug3_btn, sug4_btn, doc_indicator],
+            )
             parse_pdf_btn.click(
                 fn=process_custom_pdf,
                 inputs=[upload_file, doc_title_box],
-                outputs=[ingest_status_html, toc_preview_md, leaf_preview_html, sug1_btn, sug2_btn, sug3_btn, sug4_btn],
+                outputs=[ingest_status_html, toc_preview_md, leaf_preview_html, sug1_btn, sug2_btn, sug3_btn, sug4_btn, doc_indicator],
             )
             reload_sample_btn.click(
                 fn=load_sample_os_tome,
-                outputs=[ingest_status_html, toc_preview_md, leaf_preview_html, sug1_btn, sug2_btn, sug3_btn, sug4_btn],
+                outputs=[ingest_status_html, toc_preview_md, leaf_preview_html, sug1_btn, sug2_btn, sug3_btn, sug4_btn, doc_indicator],
             )
 
         with gr.TabItem("SearchTome Benchmarks"):
