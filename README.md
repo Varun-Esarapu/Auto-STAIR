@@ -34,30 +34,30 @@ tags:
 
 ```mermaid
 flowchart TD
-    subgraph Ingestion ["1. Structure-Aware Ingestion"]
-        PDF["PDF Textbook / Document"] --> Parser["PyMuPDF Outline Reader"]
-        PDF -->|"No Native Outline"| Inducer["Dynamic ToC Inducer (Groq Llama-3.1-8B)"]
-        Parser --> Tree["Hierarchical ToC Tree (ToC_D)"]
+    subgraph S1["1. Structure-Aware Ingestion"]
+        PDF["PDF Textbook or Document"] --> Parser["PyMuPDF Outline Parser"]
+        PDF -->|"No Native Outline"| Inducer["Dynamic ToC Inducer - Groq 8B"]
+        Parser --> Tree["Hierarchical ToC Tree ToC_D"]
         Inducer --> Tree
-        Tree --> Leaves["Terminal Leaf Nodes (LN_D)"]
-        Leaves --> Store["SQLite Intact Leaf Store (No Fixed Chunks)"]
+        Tree --> Leaves["Terminal Leaf Nodes LN_D"]
+        Leaves --> Store["SQLite Intact Leaf Store - Zero Chunking"]
     end
 
-    subgraph Retrieval ["2. Zero-Shot Constrained Multi-Hop Retrieval"]
-        Query["User Query"] --> Table2Prompt["STAIR Table 2 Prompt Template"]
-        Tree --> Table2Prompt
-        Table2Prompt --> Router["Zero-Shot Router (Groq Llama-3.1-8B)"]
-        Router --> Trie["Prefix Tree Validator (LeafTrie)"]
-        Trie -->|"0% Hallucination Guarantee"| ValidLeaf["Verified Terminal Leaf"]
+    subgraph S2["2. Zero-Shot Constrained Multi-Hop Retrieval"]
+        Query["User Query"] --> Table2["STAIR Table 2 Prompt Template"]
+        Tree --> Table2
+        Table2 --> Router["Zero-Shot Router - Groq Llama 8B"]
+        Router --> Trie["Prefix Tree Validator - LeafTrie"]
+        Trie -->|"0% Hallucinations"| ValidLeaf["Verified Terminal Leaf"]
         ValidLeaf --> Store
-        Store --> Grader["Sufficiency Grader (LangGraph Hop 1 / 2)"]
-        Grader -->|"Insufficient"| NextHop["Hop 2 Leaf Selection"]
+        Store --> Grader["Sufficiency Grader - LangGraph Hop 1 or 2"]
+        Grader -->|"Incomplete"| NextHop["Hop 2 Leaf Selection"]
         NextHop --> Store
-        Grader -->|"Sufficient"| Synthesizer["Synthesizer (Groq Llama-3.3-70B)"]
-        Synthesizer --> FinalAnswer["Grounded Answer with [Chapter > Section > Leaf] Citations"]
+        Grader -->|"Sufficient"| Synth["Answer Synthesizer - Groq 70B"]
+        Synth --> Answer["Grounded Answer with Section Citations"]
     end
 
-    subgraph Baseline ["3. Lexical Baseline"]
+    subgraph S3["3. Lexical Baseline"]
         Query --> BM25["BM25Okapi over Terminal Leaves"]
         Store --> BM25
     end
