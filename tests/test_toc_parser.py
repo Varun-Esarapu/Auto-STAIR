@@ -183,6 +183,48 @@ def test_dynamic_toc_inducer_mocked_groq():
             os.remove(tmp_path)
 
 
+def test_universal_doc_parser_docx_and_markdown():
+    """Verify that docx and markdown files are parsed into ToC trees and leaf sections."""
+    parser = PDFToCParser()
+
+    # 1. Test Markdown
+    with tempfile.NamedTemporaryFile(suffix=".md", delete=False, mode="w", encoding="utf-8") as tmp_md:
+        tmp_md.write("# Overview\nThis is the overview paragraph.\n\n## Architecture\nDetails of the architecture.\n\n## Experiments\nResults shown here.\n")
+        tmp_md_path = tmp_md.name
+
+    try:
+        tree, sections = parser.parse_document(tmp_md_path, doc_id="test_md", book_title="Markdown Specification")
+        assert len(tree.nodes) == 3
+        assert len(sections) == 2  # Architecture and Experiments are leaves
+        assert sections[0].leaf_title == "Architecture"
+        assert "Details of the architecture" in sections[0].section_text
+    finally:
+        if os.path.exists(tmp_md_path):
+            os.remove(tmp_md_path)
+
+    # 2. Test DOCX
+    import docx
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp_docx:
+        tmp_docx_path = tmp_docx.name
+
+    try:
+        doc = docx.Document()
+        doc.add_heading("Part I: System Overview", level=1)
+        doc.add_paragraph("Introductory text about the system.")
+        doc.add_heading("Module 1.1: Core Engine", level=2)
+        doc.add_paragraph("Core engine implementation details.")
+        doc.save(tmp_docx_path)
+
+        tree, sections = parser.parse_document(tmp_docx_path, doc_id="test_docx", book_title="Docx Specification")
+        assert len(tree.nodes) == 2
+        assert len(sections) == 1  # Module 1.1 is leaf
+        assert sections[0].leaf_title == "Module 1.1: Core Engine"
+        assert "Core engine implementation" in sections[0].section_text
+    finally:
+        if os.path.exists(tmp_docx_path):
+            os.remove(tmp_docx_path)
+
+
 def test_dynamic_toc_inducer_deterministic_offline_fallback():
     """Verify deterministic font-clustering fallback when no Groq API key is present."""
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:

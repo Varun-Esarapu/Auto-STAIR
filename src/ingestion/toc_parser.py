@@ -347,3 +347,154 @@ class PDFToCParser:
             )
 
         return leaf_sections
+
+    def parse_docx(
+        self,
+        docx_path: str,
+        doc_id: Optional[str] = None,
+        book_title: Optional[str] = None,
+    ) -> Tuple[ToCTree, List[LeafSection]]:
+        """
+        Parse Word (.docx) documents using heading styles to build ToC tree
+        and extract intact leaf sections.
+        """
+        import docx
+        doc = docx.Document(docx_path)
+        actual_doc_id = doc_id or os.path.splitext(os.path.basename(docx_path))[0]
+        actual_book_title = book_title or actual_doc_id.replace("_", " ").title()
+
+        raw_toc: List[Tuple[int, str, int]] = []
+        heading_texts: List[List[str]] = []
+        current_idx = -1
+
+        for p in doc.paragraphs:
+            text = p.text.strip()
+            if not text:
+                continue
+
+            style_name = p.style.name.lower()
+            lvl = None
+            if "heading 1" in style_name:
+                lvl = 1
+            elif "heading 2" in style_name:
+                lvl = 2
+            elif "heading 3" in style_name:
+                lvl = 3
+            elif "heading" in style_name:
+                m = re.search(r"\d+", style_name)
+                lvl = int(m.group(0)) if m else 2
+
+            if lvl is not None:
+                current_idx = len(raw_toc)
+                raw_toc.append((lvl, text, 1))
+                heading_texts.append([])
+            else:
+                if current_idx >= 0:
+                    heading_texts[current_idx].append(text)
+                else:
+                    current_idx = 0
+                    raw_toc.append((1, "Introduction", 1))
+                    heading_texts.append([text])
+
+        if not raw_toc:
+            raw_toc = [(1, "Document Content", 1)]
+            heading_texts = [[p.text.strip() for p in doc.paragraphs if p.text.strip()]]
+
+        toc_tree = self._build_tree(actual_doc_id, actual_book_title, raw_toc, total_pages=1)
+        sections: List[LeafSection] = []
+        for leaf in toc_tree.leaf_nodes:
+            idx = leaf.node_id
+            txt = "\n\n".join(heading_texts[idx]) if idx < len(heading_texts) else ""
+            if not txt.strip():
+                txt = f"[{leaf.title} - Section text]"
+            sections.append(
+                LeafSection(
+                    doc_id=actual_doc_id,
+                    book_title=actual_book_title,
+                    leaf_id=f"{actual_doc_id}#leaf_{idx}",
+                    tree_path=leaf.tree_path,
+                    leaf_title=leaf.title,
+                    section_text=txt,
+                    page_start=1,
+                    page_end=1,
+                )
+            )
+        return toc_tree, sections
+
+    def parse_markdown(
+        self,
+        file_path: str,
+        doc_id: Optional[str] = None,
+        book_title: Optional[str] = None,
+    ) -> Tuple[ToCTree, List[LeafSection]]:
+        """
+        Parse Markdown (.md) or text (.txt) documents using headers/formatting.
+        """
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+
+        actual_doc_id = doc_id or os.path.splitext(os.path.basename(file_path))[0]
+        actual_book_title = book_title or actual_doc_id.replace("_", " ").title()
+
+        raw_toc: List[Tuple[int, str, int]] = []
+        heading_texts: List[List[str]] = []
+        current_idx = -1
+
+        for line in lines:
+            m = re.match(r"^(#{1,6})\s+(.*)$", line.strip())
+            if m:
+                lvl = len(m.group(1))
+                title = m.group(2).strip()
+                current_idx = len(raw_toc)
+                raw_toc.append((lvl, title, 1))
+                heading_texts.append([])
+            else:
+                clean_line = line.strip()
+                if clean_line:
+                    if current_idx >= 0:
+                        heading_texts[current_idx].append(clean_line)
+                    else:
+                        current_idx = 0
+                        raw_toc.append((1, "Introduction", 1))
+                        heading_texts.append([clean_line])
+
+        if not raw_toc:
+            raw_toc = [(1, "Document Content", 1)]
+            heading_texts = [[l.strip() for l in lines if l.strip()]]
+
+        toc_tree = self._build_tree(actual_doc_id, actual_book_title, raw_toc, total_pages=1)
+        sections: List[LeafSection] = []
+        for leaf in toc_tree.leaf_nodes:
+            idx = leaf.node_id
+            txt = "\n\n".join(heading_texts[idx]) if idx < len(heading_texts) else ""
+            sections.append(
+                LeafSection(
+                    doc_id=actual_doc_id,
+                    book_title=actual_book_title,
+                    leaf_id=f"{actual_doc_id}#leaf_{idx}",
+                    tree_path=leaf.tree_path,
+                    leaf_title=leaf.title,
+                    section_text=txt or f"[{leaf.title} - Content]",
+                    page_start=1,
+                    page_end=1,
+                )
+            )
+        return toc_tree, sections
+
+    def parse_document(
+        self,
+        file_path: str,
+        doc_id: Optional[str] = None,
+        book_title: Optional[str] = None,
+    ) -> Tuple[ToCTree, List[LeafSection]]:
+        """
+        Universal document ingestion router: automatically dispatches to
+        PDF outline parser, Word (.docx) parser, or Markdown/Text parser.
+        """
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in [".docx", ".doc"]:
+            return self.parse_docx(file_path, doc_id=doc_id, book_title=book_title)
+        elif ext in [".md", ".markdown", ".txt"]:
+            return self.parse_markdown(file_path, doc_id=doc_id, book_title=book_title)
+        else:
+            return self.parse_pdf(file_path, doc_id=doc_id, book_title=book_title)

@@ -166,10 +166,15 @@ footer { display: none !important; }
     flex-direction: column !important;
     gap: 4px !important;
     cursor: pointer !important;
-    white-space: normal !important;
+    white-space: pre-line !important;
     line-height: 1.4 !important;
     min-height: 72px !important;
     height: auto !important;
+}
+
+.suggestion-card-btn *, .suggestion-card-btn span {
+    white-space: pre-line !important;
+    text-align: left !important;
 }
 
 .suggestion-card-btn:hover {
@@ -484,10 +489,10 @@ def load_sample_os_tome() -> Tuple[str, str, str, str, str, str, str]:
         for s in sections
     )
 
-    sug1 = "Address Spaces & Paging\nHow does virtual memory eliminate fragmentation?"
-    sug2 = "Inode Pointer Allocation\nWhat pointers does an inode use for multi-GB files?"
-    sug3 = "TLB Cache Mechanics\nHow does a TLB accelerate virtual translation?"
-    sug4 = "Crash Consistency & WAL\nHow does journaling prevent mid-write corruption?"
+    sug1 = "Address Spaces & Paging\n↳ How does virtual memory eliminate fragmentation?"
+    sug2 = "Inode Pointer Allocation\n↳ What pointers does an inode use for multi-GB files?"
+    sug3 = "TLB Cache Mechanics\n↳ How does a TLB accelerate virtual translation?"
+    sug4 = "Crash Consistency & WAL\n↳ How does journaling prevent mid-write corruption?"
 
     doc_indicator_html = f"""
     <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #a1a1aa; padding-top: 6px;">
@@ -514,7 +519,7 @@ def process_custom_pdf(file_obj, custom_title: Optional[str] = None) -> Tuple[st
 
     try:
         parser = PDFToCParser()
-        toc_tree, sections = parser.parse_pdf(pdf_path, doc_id=doc_id, book_title=book_title)
+        toc_tree, sections = parser.parse_document(pdf_path, doc_id=doc_id, book_title=book_title)
 
         store = LeafStore(":memory:")
         store.clear()
@@ -551,10 +556,10 @@ def process_custom_pdf(file_obj, custom_title: Optional[str] = None) -> Tuple[st
         )
 
         leaf_names = [s.leaf_title for s in sections]
-        s1 = f"{leaf_names[0]}\nWhat are the primary objectives outlined in {leaf_names[0]}?" if len(leaf_names) > 0 else "Overview\nWhat is this document about?"
-        s2 = f"{leaf_names[1]}\nExplain the core methodology described in {leaf_names[1]}." if len(leaf_names) > 1 else "Methodology\nHow does this work?"
-        s3 = f"{leaf_names[min(2, len(leaf_names)-1)]}\nWhat are the benchmark baselines or key specifications?" if len(leaf_names) > 2 else "Specifications\nWhat are the details?"
-        s4 = f"{leaf_names[-1]}\nWhat are the limitations or conclusions in {leaf_names[-1]}?" if len(leaf_names) > 3 else "Conclusion\nWhat are the takeaways?"
+        s1 = f"{leaf_names[0]}\n↳ What are the primary objectives outlined in {leaf_names[0]}?" if len(leaf_names) > 0 else "Overview\n↳ What is this document about?"
+        s2 = f"{leaf_names[1]}\n↳ Explain the core methodology described in {leaf_names[1]}." if len(leaf_names) > 1 else "Methodology\n↳ How does this work?"
+        s3 = f"{leaf_names[min(2, len(leaf_names)-1)]}\n↳ What are the benchmark baselines or key specifications?" if len(leaf_names) > 2 else "Specifications\n↳ What are the details?"
+        s4 = f"{leaf_names[-1]}\n↳ What are the limitations or conclusions in {leaf_names[-1]}?" if len(leaf_names) > 3 else "Conclusion\n↳ What are the takeaways?"
 
         doc_indicator_html = f"""
         <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #34d399; padding-top: 6px;">
@@ -754,13 +759,13 @@ with gr.Blocks(title="Auto-STAIR — Structure-Aware Document Intelligence") as 
             gr.HTML(f"""<div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 6px; display:flex; align-items:center; gap:6px;">{SVG_SPARKLES} <span>Suggested Research Queries:</span></div>""")
             with gr.Row():
                 with gr.Column(scale=1):
-                    sug1_btn = gr.Button("Address Spaces & Paging\nHow does virtual memory eliminate fragmentation?", elem_classes=["suggestion-card-btn"])
+                    sug1_btn = gr.Button("Address Spaces & Paging\n↳ How does virtual memory eliminate fragmentation?", elem_classes=["suggestion-card-btn"])
                 with gr.Column(scale=1):
-                    sug2_btn = gr.Button("Inode Pointer Allocation\nWhat pointers does an inode use for multi-GB files?", elem_classes=["suggestion-card-btn"])
+                    sug2_btn = gr.Button("Inode Pointer Allocation\n↳ What pointers does an inode use for multi-GB files?", elem_classes=["suggestion-card-btn"])
                 with gr.Column(scale=1):
-                    sug3_btn = gr.Button("TLB Cache Mechanics\nHow does a TLB accelerate virtual translation?", elem_classes=["suggestion-card-btn"])
+                    sug3_btn = gr.Button("TLB Cache Mechanics\n↳ How does a TLB accelerate virtual translation?", elem_classes=["suggestion-card-btn"])
                 with gr.Column(scale=1):
-                    sug4_btn = gr.Button("Crash Consistency & WAL\nHow does journaling prevent mid-write corruption?", elem_classes=["suggestion-card-btn"])
+                    sug4_btn = gr.Button("Crash Consistency & WAL\n↳ How does journaling prevent mid-write corruption?", elem_classes=["suggestion-card-btn"])
 
             # Research Agent Results Container
             output_container = gr.HTML(
@@ -777,7 +782,7 @@ with gr.Blocks(title="Auto-STAIR — Structure-Aware Document Intelligence") as 
             # Document Inspector Drawer (Balanced 2-Column Layout - Eliminating Empty Void)
             with gr.Accordion("Document Inspector & PDF Ingestion", open=False):
                 with gr.Row():
-                    upload_file = gr.File(label="Upload Custom PDF", file_types=[".pdf"], scale=3)
+                    upload_file = gr.File(label="Upload Document (PDF, DOCX, TXT, MD)", file_types=[".pdf", ".docx", ".doc", ".txt", ".md"], scale=3)
                     with gr.Column(scale=2):
                         doc_title_box = gr.Textbox(label="Document Title (Optional)", placeholder="e.g. STAIR: Structure Aware Retriever", lines=1)
                         with gr.Row():
@@ -805,10 +810,15 @@ with gr.Blocks(title="Auto-STAIR — Structure-Aware Document Intelligence") as 
                             leaf_preview_html = gr.HTML()
 
             # Event Handlers: Clicking suggestions populates query_input
-            sug1_btn.click(lambda text: text.split("\n")[-1] if "\n" in text else text, inputs=[sug1_btn], outputs=[query_input])
-            sug2_btn.click(lambda text: text.split("\n")[-1] if "\n" in text else text, inputs=[sug2_btn], outputs=[query_input])
-            sug3_btn.click(lambda text: text.split("\n")[-1] if "\n" in text else text, inputs=[sug3_btn], outputs=[query_input])
-            sug4_btn.click(lambda text: text.split("\n")[-1] if "\n" in text else text, inputs=[sug4_btn], outputs=[query_input])
+            def _clean_sug(text: str) -> str:
+                if "\n" in text:
+                    return text.split("\n")[-1].replace("↳", "").strip()
+                return text.strip()
+
+            sug1_btn.click(_clean_sug, inputs=[sug1_btn], outputs=[query_input])
+            sug2_btn.click(_clean_sug, inputs=[sug2_btn], outputs=[query_input])
+            sug3_btn.click(_clean_sug, inputs=[sug3_btn], outputs=[query_input])
+            sug4_btn.click(_clean_sug, inputs=[sug4_btn], outputs=[query_input])
 
             ask_btn.click(
                 fn=run_research_query,
