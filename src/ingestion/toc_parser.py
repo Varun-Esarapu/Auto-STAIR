@@ -161,19 +161,31 @@ class DynamicToCInducer:
                     f"'level' (integer 1 or 2), 'title' (string), and 'page' (integer)."
                 )
 
-                response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[
-                        {"role": "system", "content": "You output only valid JSON."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.0,
-                )
-                data = json.loads(response.choices[0].message.content)
-                toc_items = data.get("toc", [])
-                if toc_items:
-                    return [(int(item["level"]), str(item["title"]), int(item["page"])) for item in toc_items]
+                models_to_try = ["llama-3.1-8b-instant", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+                response = None
+                for m in models_to_try:
+                    try:
+                        response = client.chat.completions.create(
+                            model=m,
+                            messages=[
+                                {"role": "system", "content": "You output only valid JSON."},
+                                {"role": "user", "content": prompt},
+                            ],
+                            response_format={"type": "json_object"},
+                            temperature=0.0,
+                        )
+                        if response:
+                            break
+                    except Exception as merr:
+                        if "model_not_found" in str(merr).lower() or "does not exist" in str(merr).lower():
+                            continue
+                        break
+
+                if response:
+                    data = json.loads(response.choices[0].message.content)
+                    toc_items = data.get("toc", [])
+                    if toc_items:
+                        return [(int(item["level"]), str(item["title"]), int(item["page"])) for item in toc_items]
             except Exception:
                 # If Groq fails or is offline, seamlessly use deterministic rule-based fallback
                 pass

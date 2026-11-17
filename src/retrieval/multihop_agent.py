@@ -65,12 +65,25 @@ class MultiHopSTAIRAgent:
             try:
                 from groq import Groq
                 client = Groq(api_key=self.api_key)
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=temperature,
-                )
-                return response.choices[0].message.content.strip()
+                # Try primary model first, with automatic fallback if model was retired/updated on Groq
+                candidate_models = [model]
+                if "70b" in model or "120b" in model:
+                    candidate_models.extend(["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "openai/gpt-oss-20b"])
+                else:
+                    candidate_models.extend(["openai/gpt-oss-20b", "llama-3.1-8b-instant", "qwen/qwen3.8-27b"])
+
+                for m in candidate_models:
+                    try:
+                        response = client.chat.completions.create(
+                            model=m,
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=temperature,
+                        )
+                        return response.choices[0].message.content.strip()
+                    except Exception as err:
+                        if "model_not_found" in str(err).lower() or "does not exist" in str(err).lower():
+                            continue
+                        raise err
             except Exception as e:
                 pass
 
