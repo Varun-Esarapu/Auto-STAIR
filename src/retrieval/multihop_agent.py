@@ -205,11 +205,14 @@ class MultiHopSTAIRAgent:
 
         prompt = (
             f"You are Auto-STAIR, an expert Structure-Aware Retrieval and Multi-Hop QA engine.\n"
-            f"Answer the user query strictly and faithfully using only the structured context below.\n"
-            f"Every key factual assertion MUST include an explicit citation in the form `[{sections[0].tree_path}]`.\n\n"
+            f"Answer the user query thoroughly, professionally, and faithfully using strictly the structured section context below.\n\n"
             f"Context:\n{combined_context}\n\n"
             f"User Query: {state['query']}\n\n"
-            f"Grounded Answer with Citations:"
+            f"Formatting Guidelines:\n"
+            f"1. Start with a direct, comprehensive 2-sentence summary answering the query.\n"
+            f"2. Use clean markdown formatting with bold technical terms and structured bullet points for key concepts, mechanisms, or quantitative findings.\n"
+            f"3. Every factual claim MUST cite the source leaf node using the format `[{sections[0].leaf_title}]`.\n\n"
+            f"Structured Grounded Answer:"
         )
 
         answer = self._call_llm(prompt, model=self.synthesis_model, temperature=0.1)
