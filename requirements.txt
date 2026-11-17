@@ -1,0 +1,10 @@
+# Lightweight CPU-friendly dependencies for Auto-STAIR (No torch / transformers / GPU required)
+pymupdf>=1.24.0
+groq>=0.11.0
+langgraph>=0.2.0
+pydantic>=2.7.0
+rank-bm25>=0.2.2
+datasets>=2.19.0
+gradio>=4.40.0
+python-dotenv>=1.0.1
+pytest>=8.0.0
