@@ -33,6 +33,7 @@ SVG_GITHUB = """<svg width="14" height="14" viewBox="0 0 24 24" fill="currentCol
 PREMIUM_UI_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* Override Gradio Default Theme & Orange Accents */
 :root {
     --bg-base: #09090b;
     --bg-surface: #121215;
@@ -44,6 +45,9 @@ PREMIUM_UI_CSS = """
     --text-muted: #94949e;
     --accent: #6366f1;
     --accent-light: #818cf8;
+    --primary-500: #6366f1 !important;
+    --primary-600: #4f46e5 !important;
+    --color-accent: #6366f1 !important;
     --radius-lg: 16px;
     --radius-md: 10px;
     --radius-full: 9999px;
@@ -58,108 +62,23 @@ body, .gradio-container {
 
 footer { display: none !important; }
 
-/* Top Navbar */
-.nav-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 18px 28px;
-    background: rgba(18, 18, 21, 0.65);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 24px;
+/* Tabs: Kill default orange lines */
+.tab-nav {
+    border: none !important;
+    color: var(--text-muted) !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    padding: 10px 18px !important;
+    border-bottom: 2px solid transparent !important;
 }
 
-.brand-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.tab-nav.selected, button.tab-nav[aria-selected="true"] {
+    color: #ffffff !important;
+    border-bottom: 2px solid #6366f1 !important;
+    background: transparent !important;
 }
 
-.tag-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: var(--radius-full);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--text-muted);
-    border: 1px solid var(--border-subtle);
-    text-decoration: none;
-    transition: all 0.2s ease;
-}
-
-.tag-badge:hover {
-    color: #fff;
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-.tag-primary {
-    background: rgba(99, 102, 241, 0.12);
-    color: var(--accent-light);
-    border-color: rgba(99, 102, 241, 0.28);
-}
-
-.tag-emerald {
-    background: rgba(16, 185, 129, 0.1);
-    color: #34d399;
-    border-color: rgba(16, 185, 129, 0.25);
-}
-
-/* Hero Section */
-.hero-wrapper {
-    max-width: 860px;
-    margin: 0 auto 28px auto;
-    text-align: center;
-}
-
-.hero-headline {
-    font-size: 34px;
-    font-weight: 800;
-    line-height: 1.2;
-    color: #ffffff;
-    letter-spacing: -0.03em;
-    margin-bottom: 10px;
-}
-
-.hero-subtitle {
-    font-size: 15px;
-    color: var(--text-muted);
-    line-height: 1.5;
-    max-width: 680px;
-    margin: 0 auto;
-}
-
-/* Prompt Card Container */
-.prompt-box-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 16px 20px;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    margin-bottom: 24px;
-}
-
-.prompt-box-card:focus-within {
-    border-color: var(--border-focus);
-    box-shadow: 0 0 0 1px var(--border-focus), 0 12px 35px -10px rgba(99, 102, 241, 0.2);
-}
-
-/* Suggestion Grid (QuillBot style) */
-.suggestion-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
-    margin-top: 14px;
-    margin-bottom: 24px;
-}
-
+/* Suggestion Grid & Multi-line Cards */
 .suggestion-card-btn {
     background: var(--bg-surface) !important;
     border: 1px solid var(--border-subtle) !important;
@@ -167,17 +86,23 @@ footer { display: none !important; }
     padding: 14px 16px !important;
     text-align: left !important;
     color: var(--text-main) !important;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
     display: flex !important;
     flex-direction: column !important;
+    justify-content: center !important;
     gap: 4px !important;
+    height: 100% !important;
+    min-height: 72px !important;
     cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .suggestion-card-btn:hover {
     background: var(--bg-card-hover) !important;
-    border-color: rgba(99, 102, 241, 0.4) !important;
+    border-color: rgba(99, 102, 241, 0.45) !important;
     transform: translateY(-2px) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
 }
 
 .sug-title {
